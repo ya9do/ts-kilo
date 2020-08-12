@@ -75,10 +75,26 @@ const delChar = (cfg: TConfig) => {
     }
 }
 
+const insertRow = (cfg: TConfig) => {
+    cfg.lines.push("")
+}
+
 const insertChar = (c: string, cfg: TConfig) => {
-    // TODO the case when insert characters between "space"
-    const orig = cfg.lines[cfg.cy]
-    cfg.lines[cfg.cy] = orig.slice(0, cfg.cx) + c + orig.slice(cfg.cx)
+    let fileRow = cfg.rowoff + cfg.cy
+    let fileCol = cfg.coloff + cfg.cx
+
+    if(!cfg.lines[fileRow]){
+        while(cfg.lines.length <= fileRow){
+            insertRow(cfg)
+        }
+    }
+
+    // pad the string with spaces if the insert location is outside current length
+    if(fileCol > cfg.lines[fileRow].length){
+        cfg.lines[fileRow] = cfg.lines[fileRow].padEnd(fileCol)
+    }
+    const orig = cfg.lines[fileRow]
+    cfg.lines[fileRow] = orig.slice(0, fileCol) + c + orig.slice(fileCol)
     cfg.cx++
 }
 
