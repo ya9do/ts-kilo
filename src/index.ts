@@ -2,6 +2,12 @@
 import * as readline from "readline"
 const wait = (msec: number) => new Promise(resolve => setTimeout(resolve, msec))
 
+/**
+ * Constants
+ */
+const KILO_QUIT_TIMES = 3
+const STATUS_BAR_ROWS = 2
+
 type TConfig = {
     cx: number,
     cy: number,
@@ -10,12 +16,13 @@ type TConfig = {
     screenrows: number,
     numrows: number,
     rawmode: number,
-    row: TRow | null,
+    lines: string[],
     dirty: number,
     filename: string | null,
     statusmsg: string,
     statusmsg_time: number,
     quit_times: number,
+    lastKey: string | null,
 }
 
 type abuf = {
@@ -26,63 +33,93 @@ const abAppend = (ab: abuf, s: string) => {
     ab.b = ab.b + s
 }
 
+/** ================ screen ====================*/
 const refleshScreen = (cfg: TConfig) => {
-    process.stdout.cursorTo(0,0)
+    process.stdout.cursorTo(0, 0)
     let buf = ""
     let rows = process.stdout.rows
     let cols = process.stdout.columns
-    for(let i = 0;i<rows-1; i++){
-        buf += "" + "\n"
+
+    // TODO offset
+    for (let i = 0; i < rows - STATUS_BAR_ROWS; i++) {
+        if (cfg.lines[i]) {
+            buf += cfg.lines[i].padEnd(process.stdout.columns) + "\n"
+        }else{
+            buf += "\n"
+        }
     }
     // status bar
-    // TODO
-    // padding right edge, if rewrite strings is shorter than previous, the last chunk of previous will remain.
-    buf += `this is the last line Ln: ${cfg.cy}, Col: ${cfg.cx}  `
     process.stdout.write(buf)
+    refleshStatusBar(cfg)
+    process.stdout.cursorTo(cfg.cx, cfg.cy)
+}
+
+const refleshStatusBar = (cfg: TConfig) => {
+    process.stdout.cursorTo(0, process.stdout.rows-STATUS_BAR_ROWS)
+    let buf = `HELP: Press Ctrl-Q 3times to quit. Ln: ${cfg.cy}, Col: ${cfg.cx}, Key: ${cfg.lastKey}`.padEnd(process.stdout.columns)
+    process.stdout.write(buf + "\n")
+    process.stdout.write(cfg.lines.join("R"))
     process.stdout.cursorTo(cfg.cx, cfg.cy)
 }
 
 // TODO
 // dynamic reflection on change of window size
 
-/**
- * Constants
- */
-const KILO_QUIT_TIMES = 3
+const delChar = (cfg: TConfig) => {
+    if (cfg.cx == 0) {
+        // TODO
+    } else if (cfg.lines[cfg.cy]) {
+        const orig = cfg.lines[cfg.cy]
+        cfg.lines[cfg.cy] = orig.slice(0, cfg.cx-1) + orig.slice(cfg.cx)
+        cfg.cx--
+    }
+}
+
+const insertChar = (c: string, cfg: TConfig) => {
+    // TODO the case when insert characters between "space"
+    const orig = cfg.lines[cfg.cy]
+    cfg.lines[cfg.cy] = orig.slice(0, cfg.cx) + c + orig.slice(cfg.cx)
+    cfg.cx++
+}
 
 const moveCursor = (direction: string, cfg: TConfig) => {
     switch (direction) {
         case "up":
             cfg.cy--
-            if(cfg.cy < 0) cfg.cy = 0
+            if (cfg.cy < 0) cfg.cy = 0
             break
         case "down":
             cfg.cy++
-            if(cfg.cy > process.stdout.rows - 2) cfg.cy = process.stdout.rows - 2
+            if (cfg.cy > process.stdout.rows - 2) cfg.cy = process.stdout.rows - 2
             break
         case "left":
             cfg.cx--
-            if(cfg.cx < 0) cfg.cx = 0
+            if (cfg.cx < 0) cfg.cx = 0
             break
         case "right":
             cfg.cx++
-            if(cfg.cx > process.stdout.columns) cfg.cx = process.stdout.columns
+            if (cfg.cx > process.stdout.columns) cfg.cx = process.stdout.columns
             break
         default:
     }
-    refleshScreen(cfg)
 }
 
 const processKeypress = (str: string, key: any, cfg: TConfig) => {
     if (key.name == "up" || key.name == "down" || key.name == "right" || key.name == "left") {
         moveCursor(key.name, cfg)
-    } else if (key.ctrl && key.name === 'c' && cfg.quit_times <= 1) {
-        process.stdout.write("Ctrl-C pressed \n")
+    } else if (key.name == "backspace" || key.name == "delete") {
+        delChar(cfg)
+    } else if (key.ctrl && key.name === 'q' && cfg.quit_times <= 1) {
+        process.stdout.write("Ctrl-q pressed \n")
         process.exit(1)
-    } else if (key.ctrl && key.name === 'c') {
-        process.stdout.write(`${cfg.quit_times - 1} times more to quit \n`)
+    } else if (key.ctrl && key.name === 'q') {
+        process.stdout.write(`press Ctrl-Q ${cfg.quit_times - 1} times more to quit \n`)
         cfg.quit_times--
+    } else {
+        insertChar(key.name, cfg)
     }
+    cfg.lastKey = key.name
+    refleshScreen(cfg)
 }
 
 const initEditor = (cfg: TConfig) => {
@@ -104,39 +141,29 @@ const initEditor = (cfg: TConfig) => {
     cfg.rowoff = 0;
     cfg.coloff = 0;
     cfg.numrows = 0;
-    cfg.row = null;
+    cfg.lines = [];
     cfg.dirty = 0;
     cfg.filename = null;
-
+    cfg.lastKey = null;
+    refleshStatusBar(cfg)
     //TODO
     //E.syntax = NULL;
 
 }
 
-type TRow = {
-    idx: number,
-    size: number,
-    rsize: number,
-    chars: string,
-    render: string,
-    hl: string,
-    hl_oc: number
+const testInput = (cfg: TConfig) => {
+    if (cfg.lines) {
+        cfg.lines[0] = "test line1"
+        cfg.lines[1] = "test line2"
+    }
+    refleshScreen(cfg)
 }
 
 const main = async () => {
     console.clear()
     let cfg: TConfig = {} as TConfig
     initEditor(cfg)
-
-    // while(true){
-    //     refleshScreen(cfg)
-    // }
-    // process.stdout.write("hello: ");
-    // await wait(1000)
-    // flush()
-    // await wait(1000)
-    // clear()
-    // await wait(1000)
+    testInput(cfg)
 }
 
 main()
