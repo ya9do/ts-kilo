@@ -45,7 +45,7 @@ const refleshScreen = (cfg: TConfig) => {
         if (cfg.lines[i]) {
             buf += cfg.lines[i].padEnd(process.stdout.columns) + "\n"
         }else{
-            buf += "\n"
+            buf += "".padEnd(process.stdout.columns) + "\n"
         }
     }
     // status bar
@@ -66,11 +66,26 @@ const refleshStatusBar = (cfg: TConfig) => {
 // dynamic reflection on change of window size
 
 const delChar = (cfg: TConfig) => {
+    //TODO
+    // think about offset
+
     if (cfg.cx == 0) {
-        // TODO
+        if(cfg.cy == 0){
+            //TODO
+        }else{
+            const prevLast = cfg.lines[cfg.cy-1].length
+            cfg.lines[cfg.cy-1] = cfg.lines[cfg.cy-1] + cfg.lines[cfg.cy]
+            cfg.lines.splice(cfg.cy, 1)
+            cfg.cx = prevLast
+            cfg.cy--
+            // TODO
+            // take care delete pressed where no text
+        }
     } else if (cfg.lines[cfg.cy]) {
         const orig = cfg.lines[cfg.cy]
         cfg.lines[cfg.cy] = orig.slice(0, cfg.cx-1) + orig.slice(cfg.cx)
+        cfg.cx--
+    } else {
         cfg.cx--
     }
 }
@@ -171,6 +186,7 @@ const testInput = (cfg: TConfig) => {
     if (cfg.lines) {
         cfg.lines[0] = "test line1"
         cfg.lines[1] = "test line2"
+        cfg.lines[2] = "test line3"
     }
     refleshScreen(cfg)
 }
